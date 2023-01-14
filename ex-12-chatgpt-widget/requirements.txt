@@ -3,3 +3,4 @@ openai
 asyncio
 qasync
 qt-material
+pyinstaller
