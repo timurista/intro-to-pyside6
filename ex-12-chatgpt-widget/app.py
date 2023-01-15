@@ -8,8 +8,11 @@ from uuid import uuid4
 import openai
 import qasync
 from dotenv import load_dotenv
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QApplication, QLabel, QLineEdit, QProgressBar,
-                               QPushButton, QTextEdit, QVBoxLayout, QWidget)
+                               QPushButton, QSplashScreen, QTextEdit,
+                               QVBoxLayout, QWidget)
 from qt_material import apply_stylesheet
 
 load_dotenv()
@@ -21,12 +24,6 @@ def create_conversation_item(user_name, text):
         "user": user_name,
         "text": text
     }
-
-def get_conversation_id():
-    # random conversation id ie "7f8ee916-7ccf-46bb-9a2c-3b40913a1558"
-    # create random conversation id
-    # make it string
-    return str(uuid4())
 
 def get_prompt(text_to_send):
     # gets the last items up to 4000 characters in the conversation history
@@ -41,15 +38,30 @@ def get_prompt(text_to_send):
     prompt = ""
     for item in last_conversation_items:
         prompt += f"{item['user']}: {item['text']}\n"
-    prompt += "HUMAN: "+text_to_send
+    prompt += "HUMAN: "+prompt_engineering(text_to_send)
     return prompt
 
 
+def prompt_engineering(prompt_test):
+    truthfullness_statement = "Answer the question as truthfully as possible, and if you're very unsure of the answer, say \"Sorry, I don't know\""
+    return prompt_test
+    # return f"""{truthfullness_statement}. {prompt_test}"""
+
+class QInputField(QTextEdit):
+    def keyPressEvent(self, event):
+        # command + enter
+        if event.modifiers() == Qt.ControlModifier and event.key() == Qt.Key_Return:
+            self.generate_text()
+        else:
+            super().keyPressEvent(event)
 
 def main():
-    conversation_id = get_conversation_id()
 
     app = QApplication(sys.argv)
+    pixmap = QPixmap("splash.png")
+    splash = QSplashScreen(pixmap)
+    splash.show()
+    app.processEvents()
     loop = qasync.QEventLoop(app)
 
     # styling
@@ -61,7 +73,7 @@ def main():
 
 
     # Create the input field
-    input_field = QTextEdit()
+    input_field = QInputField()
     input_field.setPlaceholderText("Enter your prompt here")
 
     # Create the generate button
@@ -107,7 +119,7 @@ def main():
             progress_bar.setValue(100)
             generated_text = response["choices"][0]["text"]
             # trim empty lines and spaces from generated_text
-            generated_text = generated_text.strip()
+            generated_text = generated_text.strip(" \n")
             question_text = question_text.strip()
             current_text = output_field.toPlainText()
             conversation_history.append(create_conversation_item("HUMAN", question_text))
@@ -124,6 +136,9 @@ def main():
 
     # Load your API key from an environment variable or secret management service
     generate_button.clicked.connect(generate_text)
+
+    input_field.generate_text = generate_text
+
 
     def stop_requesting():
         generate_text_task.cancel()
@@ -158,6 +173,8 @@ def main():
 
     # Show the main window
     window.show()
+
+    splash.finish(window)
 
     # with loop:
     #     loop.run_forever()

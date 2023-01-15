@@ -3,4 +3,5 @@ openai
 asyncio
 qasync
 qt-material
+python-dotenv
 pyinstaller
