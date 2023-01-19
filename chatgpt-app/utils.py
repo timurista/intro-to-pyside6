@@ -2,7 +2,6 @@ import asyncio
 import json
 import os
 
-conversation_history = []
 
 def create_conversation_item(user_name, text):
     return {
@@ -10,7 +9,7 @@ def create_conversation_item(user_name, text):
         "text": text
     }
 
-def get_prompt(text_to_send):
+def get_prompt(text_to_send, conversation_history):
     # gets the last items up to 4000 characters in the conversation history
     # iterate over conversation history and add until limit is reached
     # return the prompt

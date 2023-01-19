@@ -30,8 +30,11 @@ class QInputField(QTextEdit):
             super().keyPressEvent(event)
 
 class MainWindow(QWidget):
+
     def __init__(self):
         super().__init__()
+
+        self.conversation_history = []
 
         self.generate_text_task = None
         self.setWindowTitle("ChatGPT Desktop Client")
@@ -114,7 +117,7 @@ class MainWindow(QWidget):
         try:
             self.stop_button.show()
             question_text = self.input_field.toPlainText()
-            prompt = get_prompt(question_text)
+            prompt = get_prompt(question_text, self.conversation_history)
             self.progress_bar.show()
             print(prompt)
             self.progress_bar.setValue(50)
@@ -126,8 +129,8 @@ class MainWindow(QWidget):
             generated_text = generated_text.strip(" \n")
             question_text = question_text.strip()
             current_text = self.output_field.toPlainText()
-            conversation_history.append(create_conversation_item("HUMAN", question_text))
-            conversation_history.append(create_conversation_item("AI", generated_text))
+            self.conversation_history.append(create_conversation_item("HUMAN", question_text))
+            self.conversation_history.append(create_conversation_item("AI", generated_text))
             self.output_field.append(current_text + "\n---\n\n" + generated_text)
         except CancelledError:
             pass

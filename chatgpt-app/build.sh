@@ -25,7 +25,6 @@ fi
 pyinstaller --onefile  \
     --add-data="splash.png:splash.png" \
     $FLAG \
-    --icon "icon.icns" \
     --runtime-hook=$HOOKFILE \
     --path=venv/lib/python3.8/site-packages \
     --name=chatblast --osx-bundle-identifier=com.yourcompany.myapp app.py
