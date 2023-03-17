@@ -1,3 +1,2 @@
 # !/bin/bash
-# --add-data="."
-pyinstaller --onefile --add-data="." --name=myapp --osx-bundle-identifier=com.yourcompany.myapp app.py
+pyinstaller --onefile --add-data="." --name=mychatblast --osx-bundle-identifier=com.chatblast.mychatblast app.py

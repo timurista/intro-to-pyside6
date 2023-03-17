@@ -88,6 +88,10 @@ def main():
 
     # The Open AI stuff
     openai.api_key = os.getenv("OPENAI_API_KEY")
+    chat_mode = os.getenv("CHAT_MODE") == "true"
+    model = "text-davinci-003"
+    if chat_mode:
+        model = os.getenv("OPENAI_MODEL")
 
     def generate_text():
         global generate_text_task
@@ -101,12 +105,27 @@ def main():
             question_text = input_field.toPlainText()
             prompt = get_prompt(question_text)
             progress_bar.show()
+            progress_bar.setValue(50)
             print(prompt)
-            response = await asyncio.get_event_loop().run_in_executor(None, functools.partial(openai.Completion.create, model="text-davinci-003", prompt=prompt, temperature=0, max_tokens=512, top_p=1 ))
+            print("is chat mode", chat_mode)
+            core_function = functools.partial(openai.Completion.create, model=model, prompt=prompt, temperature=0, max_tokens=512, top_p=1 )
+            if chat_mode:
+                core_function = functools.partial(openai.ChatCompletion.create, messages=[
+                    {
+                        "role": "system", "content": "Please answer the question to the best of your abilities, make sure to give good detailed examples."
+                    },
+                    {
+                        "role": "user", "content": question_text
+                    }
+                ], model=model, temperature=0, top_p=1 )
+            response = await asyncio.get_event_loop().run_in_executor(None, core_function)
             print(response)
             progress_bar.setValue(100)
-            generated_text = response["choices"][0]["text"]
-            # trim empty lines and spaces from generated_text
+            if chat_mode:
+                generated_text = response["choices"][0]["message"]["content"]
+            else:
+                generated_text = response["choices"][0]["text"]
+                # trim empty lines and spaces from generated_text
             generated_text = generated_text.strip()
             question_text = question_text.strip()
             current_text = output_field.toPlainText()
