@@ -8,25 +8,46 @@ from uuid import uuid4
 import openai
 import qasync
 from dotenv import load_dotenv
-from PySide6.QtWidgets import (QApplication, QLabel, QLineEdit, QProgressBar,
-                               QPushButton, QTextEdit, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QComboBox, QLabel, QLineEdit,
+                               QProgressBar, QPushButton, QTextEdit,
+                               QVBoxLayout, QWidget)
 from qt_material import apply_stylesheet
 
 load_dotenv()
 
 conversation_history = []
 
+# Add a list of users and their content
+users = [
+    {
+        "name": "Student",
+        "content": "Please answer the question to the best of your abilities, make sure to give good detailed examples.",
+    },
+    {
+        "name": "Software Engineer",
+        "content": "Act as a senior software engineer and recommend the best solution to the problem and outline tradeoffs.",
+    },
+    {
+        "name": "Designer",
+        "content": "Act as a Designer and recommend the best solution to the problem and outline tradeoffs.",
+    },
+    {
+        "name": "CFO",
+        "content": "Act as a CFO and recommend the best solution to the problem and outline tradeoffs.",
+    },
+]
+
+
 def create_conversation_item(user_name, text):
-    return {
-        "user": user_name,
-        "text": text
-    }
+    return {"user": user_name, "text": text}
+
 
 def get_conversation_id():
     # random conversation id ie "7f8ee916-7ccf-46bb-9a2c-3b40913a1558"
     # create random conversation id
     # make it string
     return str(uuid4())
+
 
 def get_prompt(text_to_send):
     # gets the last items up to 4000 characters in the conversation history
@@ -41,9 +62,8 @@ def get_prompt(text_to_send):
     prompt = ""
     for item in last_conversation_items:
         prompt += f"{item['user']}: {item['text']}\n"
-    prompt += "HUMAN: "+text_to_send
+    prompt += "HUMAN: " + text_to_send
     return prompt
-
 
 
 def main():
@@ -58,7 +78,6 @@ def main():
     # Create the main window
     window = QWidget()
     window.setWindowTitle("ChatGPT Desktop Client")
-
 
     # Create the input field
     input_field = QTextEdit()
@@ -86,6 +105,14 @@ def main():
     progress_bar.setRange(0, 100)
     progress_bar.hide()
 
+    # Create a dropdown menu for selecting a system user
+    user_dropdown = QComboBox()
+    for user in users:
+        user_dropdown.addItem(user["name"])
+
+    user_dropdown.currentIndexChanged.connect(lambda: select_user(user_dropdown))
+    selected_user = users[user_dropdown.currentIndex()]
+
     # The Open AI stuff
     openai.api_key = os.getenv("OPENAI_API_KEY")
     chat_mode = os.getenv("CHAT_MODE") == "true"
@@ -107,17 +134,25 @@ def main():
             progress_bar.show()
             progress_bar.setValue(50)
             print(prompt)
-            print("is chat mode", chat_mode)
-            core_function = functools.partial(openai.Completion.create, model=model, prompt=prompt, temperature=0, max_tokens=512, top_p=1 )
+            core_function = functools.partial(
+                openai.Completion.create,
+                model=model,
+                prompt=prompt,
+                temperature=0,
+                max_tokens=512,
+                top_p=1,
+            )
             if chat_mode:
-                core_function = functools.partial(openai.ChatCompletion.create, messages=[
-                    {
-                        "role": "system", "content": "Please answer the question to the best of your abilities, make sure to give good detailed examples."
-                    },
-                    {
-                        "role": "user", "content": question_text
-                    }
-                ], model=model, temperature=0, top_p=1 )
+                core_function = functools.partial(
+                    openai.ChatCompletion.create,
+                    messages=[
+                        {"role": "system", "content": selected_user["content"]},
+                        {"role": "user", "content": question_text},
+                    ],
+                    model=model,
+                    temperature=0,
+                    top_p=1,
+                )
             response = await asyncio.get_event_loop().run_in_executor(None, core_function)
             print(response)
             progress_bar.setValue(100)
@@ -160,6 +195,7 @@ def main():
 
     # Create the layout
     layout = QVBoxLayout()
+    layout.addWidget(user_dropdown)
     layout.addWidget(input_field)
     layout.addWidget(generate_button)
     layout.addWidget(progress_bar)
@@ -167,7 +203,6 @@ def main():
     layout.addWidget(clear_button)
     layout.addWidget(output_label)
     layout.addWidget(output_field)
-
 
     # Set the layout for the main window
     window.setLayout(layout)
@@ -183,5 +218,6 @@ def main():
 
     sys.exit(app.exec())
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     print(main())
