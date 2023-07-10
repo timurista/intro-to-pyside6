@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QLabel, QLineEdit,
                                QTextEdit, QVBoxLayout, QWidget)
 from qt_material import apply_stylesheet
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 conversation_history = []
 
