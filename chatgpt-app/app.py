@@ -6,11 +6,14 @@ from asyncio import CancelledError
 from uuid import uuid4
 
 import openai
+import PySide6.QtGui as QtGui
 import qasync
 from dotenv import load_dotenv
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (QApplication, QComboBox, QLabel, QLineEdit,
-                               QProgressBar, QPushButton, QTextEdit,
-                               QVBoxLayout, QWidget)
+                               QProgressBar, QPushButton, QSizePolicy,
+                               QTextEdit, QVBoxLayout, QWidget)
 from qt_material import apply_stylesheet
 
 load_dotenv()
@@ -65,23 +68,48 @@ def get_prompt(text_to_send):
     prompt += "HUMAN: " + text_to_send
     return prompt
 
+class MainWindow(QWidget):
+    update_output_signal = Signal(str)
+    cancelled_signal = Signal(bool)
+    progress_signal = Signal(int)
+    cancelled = False
+
+    def __init__(self, *args, **kwargs):
+        super(MainWindow, self).__init__(*args, **kwargs)
+        self.update_output_signal.connect(self.update_output)
+        self.cancelled_signal.connect(self.set_cancelled)
+
+
+    def update_output(self, text):
+        self.output_field.setPlainText(text)
+        self.output_field.moveCursor(QtGui.QTextCursor.End)
+
+    def set_cancelled(self, cancelled):
+        self.cancelled = cancelled
+
+    def check_cancelled(self):
+        return self.cancelled
 
 def main():
     conversation_id = get_conversation_id()
 
     app = QApplication(sys.argv)
+
     loop = qasync.QEventLoop(app)
 
     # styling
-    apply_stylesheet(app, theme="dark_blue.xml")
+    # apply_stylesheet(app, theme="dark_blue.xml")
+    default_font = QFont("Arial", 20)  # Change "12" to your desired font size
+    app.setFont(default_font)
 
     # Create the main window
-    window = QWidget()
+    window = MainWindow()
     window.setWindowTitle("ChatGPT Desktop Client")
 
     # Create the input field
-    input_field = QTextEdit()
-    input_field.setPlaceholderText("Enter your prompt here")
+    window.input_field = QTextEdit()
+    window.input_field.setPlaceholderText("Enter your prompt here")
+    window.input_field.setFont(default_font)
 
     # Create the generate button
     generate_button = QPushButton("Generate")
@@ -97,18 +125,30 @@ def main():
     output_label = QLabel("Generated text:")
 
     # Create the output field
-    output_field = QTextEdit()
-    output_field.setReadOnly(True)
+    window.output_field = QTextEdit()
+    window.output_field.setReadOnly(True)
+    default_font.setPointSize(default_font.pointSize() + 2)
+    window.output_field.setFont(default_font)
+
+    # Set the size policy
+    sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+    window.output_field.setSizePolicy(sizePolicy)
 
     # Create a progress bar
     progress_bar = QProgressBar()
     progress_bar.setRange(0, 100)
     progress_bar.hide()
+    window.progress_signal.connect(progress_bar.setValue)
 
     # Create a dropdown menu for selecting a system user
     user_dropdown = QComboBox()
     for user in users:
         user_dropdown.addItem(user["name"])
+
+    def select_user(user_dropdown):
+        selected_user = users[user_dropdown.currentIndex()]
+
+        # window.input_field.setPlainText(selected_user["content"])
 
     user_dropdown.currentIndexChanged.connect(lambda: select_user(user_dropdown))
     selected_user = users[user_dropdown.currentIndex()]
@@ -129,7 +169,7 @@ def main():
     async def generate_text_async():
         try:
             stop_button.show()
-            question_text = input_field.toPlainText()
+            question_text = window.input_field.toPlainText()
             prompt = get_prompt(question_text)
             progress_bar.show()
             progress_bar.setValue(50)
@@ -143,44 +183,62 @@ def main():
                 top_p=1,
             )
             if chat_mode:
+                #  join the history in conversation so far and truncate the first 7000 characters
+                context = ""
+                for item in reversed(conversation_history):
+                    context += f"{item['user']}: {item['text']}\n"
+                context = context[:7000]+"\n\n"+question_text
                 core_function = functools.partial(
                     openai.ChatCompletion.create,
                     messages=[
                         {"role": "system", "content": selected_user["content"]},
-                        {"role": "user", "content": question_text},
+                        {"role": "user", "content": context+question_text},
                     ],
                     model=model,
                     temperature=0,
                     top_p=1,
+                    stream=True,
                 )
             response = await asyncio.get_event_loop().run_in_executor(None, core_function)
-            print(response)
-            progress_bar.setValue(100)
-            if chat_mode:
-                generated_text = response["choices"][0]["message"]["content"]
-            else:
-                generated_text = response["choices"][0]["text"]
-                # trim empty lines and spaces from generated_text
+            generated_text = ""
+            last_chunk = ""
+            for chunk in response:
+                cancelled = window.check_cancelled()
+                if cancelled:
+                    break
+                if 'content' in chunk['choices'][0]['delta']:
+                    new_chunk = chunk['choices'][0]['delta']['content']
+                    print(new_chunk)
+                    generated_text += new_chunk
+                    window.progress_signal.emit(50 + (len(generated_text) / 10))
+                    current_text = window.output_field.toPlainText()
+                    # output_field.setPlainText(generated_text)
+                    window.update_output_signal.emit(generated_text)
+                    QApplication.processEvents()
+                    last_chunk = new_chunk
             generated_text = generated_text.strip()
             question_text = question_text.strip()
-            current_text = output_field.toPlainText()
             conversation_history.append(create_conversation_item("HUMAN", question_text))
             conversation_history.append(create_conversation_item("AI", generated_text))
-            output_field.append(current_text + "\n---\n\n" + generated_text)
+            # output_field.append(current_text + "\n---\n\n" + generated_text)
+            progress_bar.setValue(100)
         except CancelledError:
-            pass
+            raise  # re-raise the exception to actually cancel the task
         except Exception as e:
             print(e)
-            output_field.append("Error: " + str(e))
+            # output_field.append("Error: " + str(e))
+            window.update_output_signal.emit("Error: " + str(e))
         finally:
             progress_bar.hide()
             stop_button.hide()
+            window.cancelled_signal.emit(False)
 
     # Load your API key from an environment variable or secret management service
     generate_button.clicked.connect(generate_text)
 
     def stop_requesting():
         generate_text_task.cancel()
+        window.cancelled_signal.emit(True)
         # Disconnect the generate button to stop requesting new text
         # generate_button.clicked.disconnect()
 
@@ -189,20 +247,30 @@ def main():
     def clear_output():
         # reset conversation history
         conversation_history.clear()
-        output_field.setText("")
+        window.output_field.setText("")
 
     clear_button.clicked.connect(clear_output)
+
+    # Create a clear input button
+    clear_input_button = QPushButton("Clear Input")
+
+    # Function to clear the input field
+    def clear_input():
+        window.input_field.setText("")
+
+    clear_input_button.clicked.connect(clear_input)
 
     # Create the layout
     layout = QVBoxLayout()
     layout.addWidget(user_dropdown)
-    layout.addWidget(input_field)
+    layout.addWidget(window.input_field)
     layout.addWidget(generate_button)
     layout.addWidget(progress_bar)
     layout.addWidget(stop_button)
     layout.addWidget(clear_button)
     layout.addWidget(output_label)
-    layout.addWidget(output_field)
+    layout.addWidget(window.output_field)
+    layout.addWidget(clear_input_button)
 
     # Set the layout for the main window
     window.setLayout(layout)
@@ -213,8 +281,8 @@ def main():
     # Show the main window
     window.show()
 
-    # with loop:
-    #     loop.run_forever()
+    # Adjust heights
+    window.output_field.setFixedHeight(1.5 * window.input_field.height())
 
     sys.exit(app.exec())
 
