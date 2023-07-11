@@ -1,5 +1,6 @@
 import asyncio
 import functools
+import json
 import os
 import sys
 from asyncio import CancelledError
@@ -11,9 +12,9 @@ import qasync
 from dotenv import load_dotenv
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (QApplication, QComboBox, QLabel, QLineEdit,
-                               QProgressBar, QPushButton, QSizePolicy,
-                               QTextEdit, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel,
+                               QLineEdit, QProgressBar, QPushButton,
+                               QSizePolicy, QTextEdit, QVBoxLayout, QWidget)
 from qt_material import apply_stylesheet
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
@@ -40,6 +41,20 @@ users = [
     },
 ]
 
+models = [
+    {
+        "name": "gpt-4",
+        "id": "gpt-4"
+    },
+    {
+        "name": "gpt-4-32k",
+        "id": "gpt-4-32k"
+    },
+    {
+        "name": "gpt-3.5-turbo",
+        "id": "gpt-3.5-turbo"
+    },
+]
 
 def create_conversation_item(user_name, text):
     return {"user": user_name, "text": text}
@@ -145,20 +160,31 @@ def main():
     for user in users:
         user_dropdown.addItem(user["name"])
 
+    # model selection
+    model_dropdown = QComboBox()
+    for model in models:
+        model_dropdown.addItem(model["name"])
+
+    def select_model(model_dropdown):
+        selected_model = models[model_dropdown.currentIndex()]
+        model = selected_model["id"]
+
     def select_user(user_dropdown):
         selected_user = users[user_dropdown.currentIndex()]
 
         # window.input_field.setPlainText(selected_user["content"])
 
     user_dropdown.currentIndexChanged.connect(lambda: select_user(user_dropdown))
+    model_dropdown.currentIndexChanged.connect(lambda: select_model(model_dropdown))
+
+
     selected_user = users[user_dropdown.currentIndex()]
+    selected_model = models[model_dropdown.currentIndex()]
 
     # The Open AI stuff
     openai.api_key = os.getenv("OPENAI_API_KEY")
     chat_mode = os.getenv("CHAT_MODE") == "true"
-    model = "text-davinci-003"
-    if chat_mode:
-        model = os.getenv("OPENAI_MODEL")
+
 
     def generate_text():
         global generate_text_task
@@ -173,7 +199,8 @@ def main():
             prompt = get_prompt(question_text)
             progress_bar.show()
             progress_bar.setValue(50)
-            print(prompt)
+            model = models[model_dropdown.currentIndex()]['id']
+            print(f"Using model {model}")
             core_function = functools.partial(
                 openai.Completion.create,
                 model=model,
@@ -202,13 +229,13 @@ def main():
             response = await asyncio.get_event_loop().run_in_executor(None, core_function)
             generated_text = ""
             last_chunk = ""
+
             for chunk in response:
                 cancelled = window.check_cancelled()
                 if cancelled:
                     break
                 if 'content' in chunk['choices'][0]['delta']:
                     new_chunk = chunk['choices'][0]['delta']['content']
-                    print(new_chunk)
                     generated_text += new_chunk
                     window.progress_signal.emit(50 + (len(generated_text) / 10))
                     current_text = window.output_field.toPlainText()
@@ -260,17 +287,27 @@ def main():
 
     clear_input_button.clicked.connect(clear_input)
 
+    # dropdowns
+    dropdown_layout = QHBoxLayout()
+    dropdown_layout.addWidget(user_dropdown)
+    dropdown_layout.addWidget(model_dropdown)
+
+    # Core Buttons
+    button_layout = QHBoxLayout()
+    button_layout.addWidget(generate_button)
+    button_layout.addWidget(clear_button)
+    button_layout.addWidget(clear_input_button)
+
     # Create the layout
     layout = QVBoxLayout()
-    layout.addWidget(user_dropdown)
+    layout.addLayout(dropdown_layout)
     layout.addWidget(window.input_field)
-    layout.addWidget(generate_button)
+    layout.addLayout(button_layout)
+
     layout.addWidget(progress_bar)
     layout.addWidget(stop_button)
-    layout.addWidget(clear_button)
     layout.addWidget(output_label)
     layout.addWidget(window.output_field)
-    layout.addWidget(clear_input_button)
 
     # Set the layout for the main window
     window.setLayout(layout)
