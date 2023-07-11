@@ -1,5 +1,7 @@
 import asyncio
+import base64
 import functools
+import gzip
 import json
 import os
 import sys
@@ -12,10 +14,13 @@ import qasync
 from dotenv import load_dotenv
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (QApplication, QComboBox, QHBoxLayout, QLabel,
-                               QLineEdit, QProgressBar, QPushButton,
-                               QSizePolicy, QTextEdit, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog,
+                               QHBoxLayout, QLabel, QLineEdit, QProgressBar,
+                               QPushButton, QSizePolicy, QTextEdit,
+                               QVBoxLayout, QWidget)
 from qt_material import apply_stylesheet
+
+from token_calculator import TokenCalculator
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
@@ -55,6 +60,8 @@ models = [
         "id": "gpt-3.5-turbo"
     },
 ]
+
+
 
 def create_conversation_item(user_name, text):
     return {"user": user_name, "text": text}
@@ -112,6 +119,28 @@ def main():
 
     loop = qasync.QEventLoop(app)
 
+    def save_state():
+        state = {
+            "conversation_history": conversation_history,
+            "selected_model": selected_model,
+            "selected_user": selected_user
+        }
+        with open('state.json', 'w') as f:
+            json.dump(state, f)
+    def load_state():
+        global conversation_history, selected_model, selected_user
+        try:
+            with open('state.json', 'r') as f:
+                state = json.load(f)
+                conversation_history = state["conversation_history"]
+                selected_model = state["selected_model"]
+                selected_user = state["selected_user"]
+        except FileNotFoundError:
+            # If the file doesn't exist, initialize with default values
+            conversation_history = []
+            selected_model = models[0]
+            selected_user = users[0]
+
     # styling
     # apply_stylesheet(app, theme="dark_blue.xml")
     default_font = QFont("Arial", 20)  # Change "12" to your desired font size
@@ -152,8 +181,10 @@ def main():
     # Create a progress bar
     progress_bar = QProgressBar()
     progress_bar.setRange(0, 100)
-    progress_bar.hide()
+    progress_bar.show()
     window.progress_signal.connect(progress_bar.setValue)
+    token_calculator = TokenCalculator()
+    token_calculator.progress_signal.connect(progress_bar.setValue)
 
     # Create a dropdown menu for selecting a system user
     user_dropdown = QComboBox()
@@ -185,10 +216,69 @@ def main():
     openai.api_key = os.getenv("OPENAI_API_KEY")
     chat_mode = os.getenv("CHAT_MODE") == "true"
 
+    # Add a button for file upload
+    upload_button = QPushButton("Upload File")
+
+    uploaded_files = []
+
+    def upload_file():
+        # Open a file dialog and get the selected file path
+        file_path, _ = QFileDialog.getOpenFileName()
+
+        # Read the file
+        with open(file_path, 'r') as f:
+            file_content = f.read().strip()
+
+        # Add the compressed content to the conversation history
+        conversation_history.append(create_conversation_item("HUMAN", file_content))
+        tokens = calculate_tokens()
+        token_calculator.calculate_and_emit(tokens)
+         # Add the file path to the uploaded_files list
+        uploaded_files.append(file_path)
+
+        # Update the file bar
+        update_file_bar()
+
+    upload_button.clicked.connect(upload_file)
+
+    # Create the file bar
+    file_bar = QHBoxLayout()
+
+    def clear_layout(layout):
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+    def update_file_bar():
+        # Clear the file bar
+        clear_layout(file_bar)
+
+        # Add a QPushButton for each file in the uploaded_files list
+        for file_path in uploaded_files:
+            # Create a QPushButton with the file name
+            file_name = os.path.basename(file_path)
+            file_button = QPushButton(file_name)
+
+            def on_file_button_clicked():
+                if file_path in uploaded_files:
+                    uploaded_files.remove(file_path)
+                    # and remove it from conver
+                    update_file_bar()
+                    tokens = calculate_tokens()
+                    token_calculator.calculate_and_emit(tokens)
+
+            # Connect the QPushButton's clicked signal to a lambda function that removes the file from the uploaded_files list and updates the file bar
+            # file_button.clicked.connect(lambda: uploaded_files.remove(file_path) and update_file_bar())
+            # file_button.clicked.connect(on_file_button_clicked)
+
+            # Add the QPushButton to the file bar
+            file_bar.addWidget(file_button)
+
 
     def generate_text():
         global generate_text_task
-        progress_bar.setValue(0)
+        # progress_bar.setValue(0)
         progress_bar.show()
         generate_text_task = asyncio.create_task(generate_text_async())
 
@@ -197,8 +287,7 @@ def main():
             stop_button.show()
             question_text = window.input_field.toPlainText()
             prompt = get_prompt(question_text)
-            progress_bar.show()
-            progress_bar.setValue(50)
+            # progress_bar.show()
             model = models[model_dropdown.currentIndex()]['id']
             print(f"Using model {model}")
             core_function = functools.partial(
@@ -237,7 +326,9 @@ def main():
                 if 'content' in chunk['choices'][0]['delta']:
                     new_chunk = chunk['choices'][0]['delta']['content']
                     generated_text += new_chunk
-                    window.progress_signal.emit(50 + (len(generated_text) / 10))
+                    # window.progress_signal.emit(50 + (len(generated_text) / 10))
+                    tokens = calculate_tokens() + len(generated_text.split())
+                    token_calculator.calculate_and_emit(tokens)
                     current_text = window.output_field.toPlainText()
                     # output_field.setPlainText(generated_text)
                     window.update_output_signal.emit(generated_text)
@@ -247,8 +338,6 @@ def main():
             question_text = question_text.strip()
             conversation_history.append(create_conversation_item("HUMAN", question_text))
             conversation_history.append(create_conversation_item("AI", generated_text))
-            # output_field.append(current_text + "\n---\n\n" + generated_text)
-            progress_bar.setValue(100)
         except CancelledError:
             raise  # re-raise the exception to actually cancel the task
         except Exception as e:
@@ -256,7 +345,6 @@ def main():
             # output_field.append("Error: " + str(e))
             window.update_output_signal.emit("Error: " + str(e))
         finally:
-            progress_bar.hide()
             stop_button.hide()
             window.cancelled_signal.emit(False)
 
@@ -274,7 +362,9 @@ def main():
     def clear_output():
         # reset conversation history
         conversation_history.clear()
+        uploaded_files.clear()
         window.output_field.setText("")
+        window.progress_signal.emit(0)
 
     clear_button.clicked.connect(clear_output)
 
@@ -287,6 +377,13 @@ def main():
 
     clear_input_button.clicked.connect(clear_input)
 
+    # Function to calculate the number of tokens used so far
+    def calculate_tokens():
+        total_tokens = sum(len(item["text"].split()) for item in conversation_history)
+        return total_tokens
+
+    progress_label = QLabel("Tokens used so far:")
+
     # dropdowns
     dropdown_layout = QHBoxLayout()
     dropdown_layout.addWidget(user_dropdown)
@@ -297,13 +394,16 @@ def main():
     button_layout.addWidget(generate_button)
     button_layout.addWidget(clear_button)
     button_layout.addWidget(clear_input_button)
+    button_layout.addWidget(upload_button)
 
     # Create the layout
     layout = QVBoxLayout()
     layout.addLayout(dropdown_layout)
     layout.addWidget(window.input_field)
     layout.addLayout(button_layout)
+    layout.addLayout(file_bar)
 
+    layout.addWidget(progress_label)
     layout.addWidget(progress_bar)
     layout.addWidget(stop_button)
     layout.addWidget(output_label)
@@ -322,7 +422,6 @@ def main():
     window.output_field.setFixedHeight(1.5 * window.input_field.height())
 
     sys.exit(app.exec())
-
 
 if __name__ == "__main__":
     print(main())

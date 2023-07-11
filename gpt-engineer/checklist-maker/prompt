@@ -1,0 +1,11 @@
+1. I want you to use react typescript tailwindcss and nextjs to build a checklist maker. Use mobx for state management and react-query for data fetching connecting to the python /api endpoints.
+2. I want you to write the backend in python using fastapi and openapi api v4 which exposes the endpoint for uploading the  to generate the checklists by creating a prompt.
+3. We will compile the reactjs app to a static site and host it on our server. forwarding the routes to the nextjs app.
+4. The /api endpoints will be forwarded to the fastapi app and handle the backend logic.
+5. The user should login to the site /api/login (our python backend will use auth0 to authenticate the user) For now we can use a dummy user locally and use the auth0 user for production.
+6. When the user logs in they will see a searchable list of the checklists they have created. They can click on a checklist to edit it.
+7. THey will create a new checklist by uploading a pdf then the backend will generate a checklist with 10 questions to check for based on reading the doc, description of what to ask for that question and a possible answer.
+8. Once the openi api generate the checklist it will send it back for the user to review.
+9. The frontend will conver tht elist into a workflow series of slides where there is an initial list of all filled out questions and as the user clicks through each item to check in the checklist similar to a slideshow it will preview the question and allow the user to edit it. At the end once they like it they will click submit and the checklist will be saved locally to user storage.
+10. The python api will also save it to supabase postgres database.
+11. The user can then fill out the checklist and once it is done the completed form is saved and it can be send to the client as a pdf.
