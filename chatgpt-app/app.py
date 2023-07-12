@@ -15,9 +15,9 @@ from dotenv import load_dotenv
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog,
-                               QHBoxLayout, QLabel, QLineEdit, QProgressBar,
-                               QPushButton, QSizePolicy, QTextEdit,
-                               QVBoxLayout, QWidget)
+                               QGridLayout, QHBoxLayout, QLabel, QLineEdit,
+                               QProgressBar, QPushButton, QSizePolicy,
+                               QTextEdit, QVBoxLayout, QWidget)
 from qt_material import apply_stylesheet
 
 from token_calculator import TokenCalculator
@@ -155,6 +155,10 @@ def main():
     window.input_field.setPlaceholderText("Enter your prompt here")
     window.input_field.setFont(default_font)
 
+    # Set the size policy
+    input_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    window.input_field.setSizePolicy(input_size_policy)
+
     # Create the generate button
     generate_button = QPushButton("Generate")
 
@@ -175,7 +179,7 @@ def main():
     window.output_field.setFont(default_font)
 
     # Set the size policy
-    sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+    sizePolicy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     window.output_field.setSizePolicy(sizePolicy)
 
     # Create a progress bar
@@ -185,6 +189,10 @@ def main():
     window.progress_signal.connect(progress_bar.setValue)
     token_calculator = TokenCalculator()
     token_calculator.progress_signal.connect(progress_bar.setValue)
+
+    #  size policy for the progress bar
+    progress_bar_size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    progress_bar.setSizePolicy(progress_bar_size_policy)
 
     # Create a dropdown menu for selecting a system user
     user_dropdown = QComboBox()
@@ -230,7 +238,8 @@ def main():
             file_content = f.read().strip()
 
         # Add the compressed content to the conversation history
-        conversation_history.append(create_conversation_item("HUMAN", file_content))
+        filename = os.path.basename(file_path)
+        conversation_history.append(create_conversation_item("HUMAN", f'READ the following file: {filename} with the following content: ```{file_content}```'))
         tokens = calculate_tokens()
         token_calculator.calculate_and_emit(tokens)
          # Add the file path to the uploaded_files list
@@ -398,16 +407,25 @@ def main():
 
     # Create the layout
     layout = QVBoxLayout()
-    layout.addLayout(dropdown_layout)
-    layout.addWidget(window.input_field)
-    layout.addLayout(button_layout)
-    layout.addLayout(file_bar)
 
-    layout.addWidget(progress_label)
-    layout.addWidget(progress_bar)
-    layout.addWidget(stop_button)
-    layout.addWidget(output_label)
-    layout.addWidget(window.output_field)
+    top_layout = QVBoxLayout()
+    top_layout.addLayout(dropdown_layout)
+    top_layout.addWidget(window.input_field, 1)
+    top_layout.addLayout(button_layout, 1)
+    top_layout.addLayout(file_bar, 1)
+
+    top_layout.addWidget(progress_label)
+    top_layout.addWidget(progress_bar, 1)
+    top_layout.addWidget(stop_button, 1)
+
+    bottom_layout = QVBoxLayout()
+    bottom_layout.addWidget(output_label)  # Place output_label at row 0, column 0
+    bottom_layout.addWidget(window.output_field)  # Place window.output_field at row 1, column 0
+
+
+    layout.addLayout(top_layout)
+    layout.addLayout(bottom_layout)
+
 
     # Set the layout for the main window
     window.setLayout(layout)
@@ -419,7 +437,7 @@ def main():
     window.show()
 
     # Adjust heights
-    window.output_field.setFixedHeight(1.5 * window.input_field.height())
+    # window.output_field
 
     sys.exit(app.exec())
 
