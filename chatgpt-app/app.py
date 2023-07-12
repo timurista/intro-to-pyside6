@@ -259,6 +259,11 @@ def main():
             if child.widget():
                 child.widget().deleteLater()
 
+    def remove_filename_from_history(filename):
+        for item in conversation_history:
+            if item["text"].find(f"file: {filename}") != -1:
+                conversation_history.remove(item)
+
     def update_file_bar():
         # Clear the file bar
         clear_layout(file_bar)
@@ -270,16 +275,21 @@ def main():
             file_button = QPushButton(file_name)
 
             def on_file_button_clicked():
+                print("clicked on file button", file_path, "uploaded files", uploaded_files)
                 if file_path in uploaded_files:
                     uploaded_files.remove(file_path)
+                    filename = os.path.basename(file_path)
+                    remove_filename_from_history(filename)
                     # and remove it from conver
                     update_file_bar()
                     tokens = calculate_tokens()
                     token_calculator.calculate_and_emit(tokens)
 
+
+
             # Connect the QPushButton's clicked signal to a lambda function that removes the file from the uploaded_files list and updates the file bar
             # file_button.clicked.connect(lambda: uploaded_files.remove(file_path) and update_file_bar())
-            # file_button.clicked.connect(on_file_button_clicked)
+            file_button.clicked.connect(on_file_button_clicked)
 
             # Add the QPushButton to the file bar
             file_bar.addWidget(file_button)
@@ -371,7 +381,13 @@ def main():
     def clear_output():
         # reset conversation history
         conversation_history.clear()
+
+        for file in uploaded_files:
+            filename = os.path.basename(file)
+            remove_filename_from_history(filename)
+
         uploaded_files.clear()
+        clear_layout(file_bar)
         window.output_field.setText("")
         window.progress_signal.emit(0)
 
