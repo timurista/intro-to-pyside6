@@ -14,10 +14,11 @@ import qasync
 from dotenv import load_dotenv
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog,
+from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFileDialog,
                                QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QProgressBar, QPushButton, QSizePolicy,
-                               QTextEdit, QVBoxLayout, QWidget)
+                               QMessageBox, QProgressBar, QPushButton,
+                               QScrollArea, QSizePolicy, QTextEdit,
+                               QVBoxLayout, QWidget)
 from qt_material import apply_stylesheet
 
 from token_calculator import TokenCalculator
@@ -239,7 +240,7 @@ def main():
 
         # Add the compressed content to the conversation history
         filename = os.path.basename(file_path)
-        conversation_history.append(create_conversation_item("HUMAN", f'READ the following file: {filename} with the following content: ```{file_content}```'))
+        conversation_history.append(create_conversation_item("HUMAN", f'READ the following file: {filename} and use that information to answer my question. Here is the file contents: ```{file_content}```'))
         tokens = calculate_tokens()
         token_calculator.calculate_and_emit(tokens)
          # Add the file path to the uploaded_files list
@@ -308,7 +309,6 @@ def main():
             prompt = get_prompt(question_text)
             # progress_bar.show()
             model = models[model_dropdown.currentIndex()]['id']
-            print(f"Using model {model}")
             core_function = functools.partial(
                 openai.Completion.create,
                 model=model,
@@ -327,7 +327,7 @@ def main():
                     openai.ChatCompletion.create,
                     messages=[
                         {"role": "system", "content": selected_user["content"]},
-                        {"role": "user", "content": context+question_text},
+                        {"role": "user", "content": context+"\nHUMAN: " + question_text},
                     ],
                     model=model,
                     temperature=0,
@@ -409,6 +409,35 @@ def main():
 
     progress_label = QLabel("Tokens used so far:")
 
+
+    # SHow history button
+    show_history_button = QPushButton("Show History")
+    def show_history():
+        history_text = "\n".join([f"{item['user']}: {item['text']}" for item in conversation_history])
+
+        # Create a QDialog
+        dialog = QDialog()
+
+        # Create a QTextEdit and set the history text
+        text_edit = QTextEdit()
+        text_edit.setPlainText(history_text)
+
+        # Create a QScrollArea and set the QTextEdit as its widget
+        scroll = QScrollArea()
+        scroll.setWidget(text_edit)
+        scroll.setWidgetResizable(True)
+
+        # Create a QVBoxLayout and add the QScrollArea
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(scroll)
+
+        # Set the QDialog layout and show the QDialog
+        dialog.setLayout(layout)
+        dialog.setWindowTitle("Conversation History")
+        dialog.resize(500, 800)
+        dialog.exec()
+    show_history_button.clicked.connect(show_history)
+
     # dropdowns
     dropdown_layout = QHBoxLayout()
     dropdown_layout.addWidget(user_dropdown)
@@ -420,6 +449,7 @@ def main():
     button_layout.addWidget(clear_button)
     button_layout.addWidget(clear_input_button)
     button_layout.addWidget(upload_button)
+    button_layout.addWidget(show_history_button)
 
     # Create the layout
     layout = QVBoxLayout()
