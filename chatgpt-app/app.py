@@ -21,31 +21,14 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFileDialog,
                                QVBoxLayout, QWidget)
 from qt_material import apply_stylesheet
 
+from personas import users
 from token_calculator import TokenCalculator
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 conversation_history = []
 
-# Add a list of users and their content
-users = [
-    {
-        "name": "Student",
-        "content": "Please answer the question to the best of your abilities, make sure to give good detailed examples.",
-    },
-    {
-        "name": "Software Engineer",
-        "content": "Act as a senior software engineer and recommend the best solution to the problem and outline tradeoffs.",
-    },
-    {
-        "name": "Designer",
-        "content": "Act as a Designer and recommend the best solution to the problem and outline tradeoffs.",
-    },
-    {
-        "name": "CFO",
-        "content": "Act as a CFO and recommend the best solution to the problem and outline tradeoffs.",
-    },
-]
+
 
 models = [
     {
@@ -210,9 +193,13 @@ def main():
         model = selected_model["id"]
 
     def select_user(user_dropdown):
+        global selected_user
         selected_user = users[user_dropdown.currentIndex()]
 
         # window.input_field.setPlainText(selected_user["content"])
+
+    def get_selected_user():
+        return users[user_dropdown.currentIndex()]
 
     user_dropdown.currentIndexChanged.connect(lambda: select_user(user_dropdown))
     model_dropdown.currentIndexChanged.connect(lambda: select_model(model_dropdown))
@@ -323,6 +310,8 @@ def main():
                 for item in reversed(conversation_history):
                     context += f"{item['user']}: {item['text']}\n"
                 context = context[:7000]+"\n\n"+question_text
+                selected_user = get_selected_user()
+                print("system user", selected_user["content"])
                 core_function = functools.partial(
                     openai.ChatCompletion.create,
                     messages=[
