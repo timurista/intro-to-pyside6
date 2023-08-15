@@ -81,9 +81,22 @@ class MainWindow(QWidget):
     cancelled = False
 
     def __init__(self, *args, **kwargs):
+        global models
         super(MainWindow, self).__init__(*args, **kwargs)
         self.update_output_signal.connect(self.update_output)
         self.cancelled_signal.connect(self.set_cancelled)
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        try:
+            print("Finding Models")
+            print(openai.Model.list())
+            models = [ d['id'] for d in openai.Model.list()['data'] if 'id' in d and d['id'] is not None and d['id'].startswith('gpt-')]
+            models = [{'name': m, 'id': m} for m in models]
+            # sort reversed so that gpt-4 is first
+            models.sort(key=lambda x: x['name'], reverse=True)
+
+        except Exception as e:
+            print("Error Finding Models ", e)
+            self.models = models
 
 
     def update_output(self, text):
@@ -209,7 +222,7 @@ def main():
     selected_model = models[model_dropdown.currentIndex()]
 
     # The Open AI stuff
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+
     chat_mode = os.getenv("CHAT_MODE") == "true"
 
     # Add a button for file upload
