@@ -5,3 +5,4 @@ qasync
 qt-material
 pyinstaller
 python-dotenv
+langchain
