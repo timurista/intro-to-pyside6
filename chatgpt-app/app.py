@@ -15,67 +15,40 @@ import qasync
 from dotenv import load_dotenv
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFileDialog,
-                               QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QProgressBar, QPushButton,
-                               QScrollArea, QSizePolicy, QTextEdit,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 from qt_material import apply_stylesheet
 
 from personas import users
 from textcompressor import CodeTextCompressor
 from token_calculator import TokenCalculator
+from agent_module import (
+    models,
+    conversation_history,
+    create_conversation_item,
+    get_conversation_id,
+    get_prompt,
+)
 
 compressor = CodeTextCompressor()
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-conversation_history = []
-
-
-
-models = [
-    {
-        "name": "gpt-4",
-        "id": "gpt-4"
-    },
-    {
-        "name": "gpt-4-32k",
-        "id": "gpt-4-32k"
-    },
-    {
-        "name": "gpt-3.5-turbo",
-        "id": "gpt-3.5-turbo"
-    },
-]
-
-
-
-def create_conversation_item(user_name, text):
-    return {"user": user_name, "text": text}
-
-
-def get_conversation_id():
-    # random conversation id ie "7f8ee916-7ccf-46bb-9a2c-3b40913a1558"
-    # create random conversation id
-    # make it string
-    return str(uuid4())
-
-
-def get_prompt(text_to_send):
-    # gets the last items up to 4000 characters in the conversation history
-    # iterate over conversation history and add until limit is reached
-    # return the prompt
-    last_conversation_items = []
-    for item in reversed(conversation_history):
-        if len(item["text"]) + len(last_conversation_items) > 4000:
-            break
-        last_conversation_items.append(item)
-    last_conversation_items.reverse()
-    prompt = ""
-    for item in last_conversation_items:
-        prompt += f"{item['user']}: {item['text']}\n"
-    prompt += "ME: " + text_to_send
-    return prompt
 
 class MainWindow(QWidget):
     update_output_signal = Signal(str)
@@ -92,26 +65,29 @@ class MainWindow(QWidget):
         try:
             print("Finding Models")
             # print(openai.Model.list())
-            models = [ d['id'] for d in openai.Model.list()['data'] if 'id' in d and d['id'] is not None and d['id'].startswith('gpt-')]
+            models = [
+                d["id"]
+                for d in openai.Model.list()["data"]
+                if "id" in d and d["id"] is not None and d["id"].startswith("gpt-")
+            ]
 
-            models = [{'name': m, 'id': m} for m in models]
+            models = [{"name": m, "id": m} for m in models]
             # if the model doesn't have -06 after it then add -9999
             for m in models:
                 # use regex to find gpt-4-{1...9}*
-                if not re.search(r'gpt-4-[1-9]', m['name']):
-                    m['name'] = m['name'] + '-X'
+                if not re.search(r"gpt-4-[1-9]", m["name"]):
+                    m["name"] = m["name"] + "-X"
             # sort reversed so that gpt-4 is first
-            models.sort(key=lambda x: x['name'], reverse=True)
+            models.sort(key=lambda x: x["name"], reverse=True)
             # remove the -X from the name
             for m in models:
-                m['name'] = m['name'].replace('-X', '')
+                m["name"] = m["name"].replace("-X", "")
 
             print(f"found {len(models)} models")
 
         except Exception as e:
             print("Error Finding Models ", e)
             self.models = models
-
 
     def update_output(self, text):
         self.output_field.setPlainText(text)
@@ -122,6 +98,7 @@ class MainWindow(QWidget):
 
     def check_cancelled(self):
         return self.cancelled
+
 
 def main():
     conversation_id = get_conversation_id()
@@ -134,14 +111,15 @@ def main():
         state = {
             "conversation_history": conversation_history,
             "selected_model": selected_model,
-            "selected_user": selected_user
+            "selected_user": selected_user,
         }
-        with open('state.json', 'w') as f:
+        with open("state.json", "w") as f:
             json.dump(state, f)
+
     def load_state():
         global conversation_history, selected_model, selected_user
         try:
-            with open('state.json', 'r') as f:
+            with open("state.json", "r") as f:
                 state = json.load(f)
                 conversation_history = state["conversation_history"]
                 selected_model = state["selected_model"]
@@ -231,7 +209,6 @@ def main():
     user_dropdown.currentIndexChanged.connect(lambda: select_user(user_dropdown))
     model_dropdown.currentIndexChanged.connect(lambda: select_model(model_dropdown))
 
-
     selected_user = users[user_dropdown.currentIndex()]
     selected_model = models[model_dropdown.currentIndex()]
 
@@ -249,7 +226,7 @@ def main():
         file_path, _ = QFileDialog.getOpenFileName()
 
         # Read the file
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             file_content = f.read().strip()
 
         # Add the compressed content to the conversation history
@@ -260,12 +237,22 @@ def main():
 
         print(f"Reduction {reduction:.2f}% {original_size} -> {new_size}")
         if new_size > original_size:
-            conversation_history.append(create_conversation_item("ME", f'COMPRESS the file: {filename} and use it to answer my question. Here is file contents: ```{file_content}```'))
+            conversation_history.append(
+                create_conversation_item(
+                    "ME",
+                    f"COMPRESS the file: {filename} and use it to answer my question. Here is file contents: ```{file_content}```",
+                )
+            )
         else:
-            conversation_history.append(create_conversation_item("ME", f'READ the file: {filename} and use it to answer my question. Here is file contents: ```{compressedFileContents}```'))
+            conversation_history.append(
+                create_conversation_item(
+                    "ME",
+                    f"READ the file: {filename} and use it to answer my question. Here is file contents: ```{compressedFileContents}```",
+                )
+            )
         tokens = calculate_tokens()
         token_calculator.calculate_and_emit(tokens)
-         # Add the file path to the uploaded_files list
+        # Add the file path to the uploaded_files list
         uploaded_files.append(file_path)
 
         # Update the file bar
@@ -308,15 +295,12 @@ def main():
                     tokens = calculate_tokens()
                     token_calculator.calculate_and_emit(tokens)
 
-
-
             # Connect the QPushButton's clicked signal to a lambda function that removes the file from the uploaded_files list and updates the file bar
             # file_button.clicked.connect(lambda: uploaded_files.remove(file_path) and update_file_bar())
             file_button.clicked.connect(on_file_button_clicked)
 
             # Add the QPushButton to the file bar
             file_bar.addWidget(file_button)
-
 
     def generate_text():
         global generate_text_task
@@ -330,7 +314,7 @@ def main():
             question_text = window.input_field.toPlainText()
             prompt = get_prompt(question_text)
             # progress_bar.show()
-            model = models[model_dropdown.currentIndex()]['id']
+            model = models[model_dropdown.currentIndex()]["id"]
             core_function = functools.partial(
                 openai.Completion.create,
                 model=model,
@@ -344,14 +328,14 @@ def main():
                 context = ""
                 for item in reversed(conversation_history):
                     context += f"{item['user']}: {item['text']}\n"
-                context = context[:7000]+"\n\n"+question_text
+                context = context[:7000] + "\n\n" + question_text
                 selected_user = get_selected_user()
                 print("system user", selected_user["content"])
                 core_function = functools.partial(
                     openai.ChatCompletion.create,
                     messages=[
                         {"role": "system", "content": selected_user["content"]},
-                        {"role": "user", "content": context+"\nHUMAN: " + question_text},
+                        {"role": "user", "content": context + "\nHUMAN: " + question_text},
                     ],
                     model=model,
                     temperature=0,
@@ -366,8 +350,8 @@ def main():
                 cancelled = window.check_cancelled()
                 if cancelled:
                     break
-                if 'content' in chunk['choices'][0]['delta']:
-                    new_chunk = chunk['choices'][0]['delta']['content']
+                if "content" in chunk["choices"][0]["delta"]:
+                    new_chunk = chunk["choices"][0]["delta"]["content"]
                     generated_text += new_chunk
                     # window.progress_signal.emit(50 + (len(generated_text) / 10))
                     tokens = calculate_tokens() + len(generated_text.split())
@@ -433,11 +417,13 @@ def main():
 
     progress_label = QLabel("Tokens used so far:")
 
-
     # SHow history button
     show_history_button = QPushButton("Show History")
+
     def show_history():
-        history_text = "\n".join([f"{item['user']}: {item['text']}" for item in conversation_history])
+        history_text = "\n".join(
+            [f"{item['user']}: {item['text']}" for item in conversation_history]
+        )
 
         # Create a QDialog
         dialog = QDialog()
@@ -460,6 +446,7 @@ def main():
         dialog.setWindowTitle("Conversation History")
         dialog.resize(500, 800)
         dialog.exec()
+
     show_history_button.clicked.connect(show_history)
 
     # dropdowns
@@ -492,10 +479,8 @@ def main():
     bottom_layout.addWidget(output_label)  # Place output_label at row 0, column 0
     bottom_layout.addWidget(window.output_field)  # Place window.output_field at row 1, column 0
 
-
     layout.addLayout(top_layout)
     layout.addLayout(bottom_layout)
-
 
     # Set the layout for the main window
     window.setLayout(layout)
@@ -510,6 +495,7 @@ def main():
     # window.output_field
 
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     print(main())
