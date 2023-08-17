@@ -4,6 +4,7 @@ import functools
 import gzip
 import json
 import os
+import re
 import sys
 from asyncio import CancelledError
 from uuid import uuid4
@@ -22,8 +23,10 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QDialog, QFileDialog,
 from qt_material import apply_stylesheet
 
 from personas import users
+from textcompressor import CodeTextCompressor
 from token_calculator import TokenCalculator
 
+compressor = CodeTextCompressor()
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 conversation_history = []
@@ -71,7 +74,7 @@ def get_prompt(text_to_send):
     prompt = ""
     for item in last_conversation_items:
         prompt += f"{item['user']}: {item['text']}\n"
-    prompt += "HUMAN: " + text_to_send
+    prompt += "ME: " + text_to_send
     return prompt
 
 class MainWindow(QWidget):
@@ -88,11 +91,22 @@ class MainWindow(QWidget):
         openai.api_key = os.getenv("OPENAI_API_KEY")
         try:
             print("Finding Models")
-            print(openai.Model.list())
+            # print(openai.Model.list())
             models = [ d['id'] for d in openai.Model.list()['data'] if 'id' in d and d['id'] is not None and d['id'].startswith('gpt-')]
+
             models = [{'name': m, 'id': m} for m in models]
+            # if the model doesn't have -06 after it then add -9999
+            for m in models:
+                # use regex to find gpt-4-{1...9}*
+                if not re.search(r'gpt-4-[1-9]', m['name']):
+                    m['name'] = m['name'] + '-X'
             # sort reversed so that gpt-4 is first
             models.sort(key=lambda x: x['name'], reverse=True)
+            # remove the -X from the name
+            for m in models:
+                m['name'] = m['name'].replace('-X', '')
+
+            print(f"found {len(models)} models")
 
         except Exception as e:
             print("Error Finding Models ", e)
@@ -240,7 +254,15 @@ def main():
 
         # Add the compressed content to the conversation history
         filename = os.path.basename(file_path)
-        conversation_history.append(create_conversation_item("HUMAN", f'READ the following file: {filename} and use that information to answer my question. Here is the file contents: ```{file_content}```'))
+        compressedFileContents = compressor.generate_prompt(file_content)
+        original_size, new_size = compressor.compare_lengths(file_content, compressedFileContents)
+        reduction = (original_size - new_size) / original_size * 100
+
+        print(f"Reduction {reduction:.2f}% {original_size} -> {new_size}")
+        if new_size > original_size:
+            conversation_history.append(create_conversation_item("ME", f'COMPRESS the file: {filename} and use it to answer my question. Here is file contents: ```{file_content}```'))
+        else:
+            conversation_history.append(create_conversation_item("ME", f'READ the file: {filename} and use it to answer my question. Here is file contents: ```{compressedFileContents}```'))
         tokens = calculate_tokens()
         token_calculator.calculate_and_emit(tokens)
          # Add the file path to the uploaded_files list
