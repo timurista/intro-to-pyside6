@@ -223,7 +223,7 @@ def main():
 
     # The Open AI stuff
 
-    chat_mode = os.getenv("CHAT_MODE") == "true"
+    chat_mode = os.getenv("CHAT_MODE") != "false"
 
     # Add a button for file upload
     upload_button = QPushButton("Upload File")

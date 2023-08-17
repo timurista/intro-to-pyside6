@@ -1,8 +1,20 @@
 {
-	"folders": [
-		{
-			"path": ".."
-		}
-	],
-	"settings": {}
+  "folders": [
+    {
+      "path": ".."
+    },
+    {
+      "path": "../../../Library/Python/3.9/lib/python/site-packages"
+    },
+    {
+      "path": "../../../Library/Python/3.9/lib/python/site-packages/langchain"
+    }
+  ],
+  "settings": {
+    "editor.fontSize": 18,
+    "[python]": {
+      "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "python.formatting.provider": "none"
+  }
 }
