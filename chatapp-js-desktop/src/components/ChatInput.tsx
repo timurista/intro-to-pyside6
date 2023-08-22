@@ -4,19 +4,12 @@ import { rootStore } from "../stores/RootStore"; // Update the import path to yo
 
 const ChatInput: React.FC = observer(() => {
   const { input, setInput, clearInput } = rootStore.userInputStore;
-  const { addHumanMessage, isAIResponding } = rootStore.aiAgentStore;
+  const { addHumanMessage, isAIResponding, chatHistory, documentHistory } =
+    rootStore.aiAgentStore;
 
   const handleSendMessage = async () => {
     await addHumanMessage(input);
     clearInput();
-  };
-
-  const handleDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files.length > 0) {
-      const docName = event.target.files[0].name;
-      rootStore.userInputStore.setDocumentName(docName);
-      // ... (any additional logic for the document upload)
-    }
   };
 
   return (
@@ -42,6 +35,14 @@ const ChatInput: React.FC = observer(() => {
           Stop AI Response
         </button>
       )}
+      {chatHistory.length > 0 || documentHistory.length > 0 ? (
+        <button
+          className="bg-green-500 text-white px-4 py-2 rounded-md mt-2"
+          onClick={rootStore.aiAgentStore.clearHistory}
+        >
+          Clear History
+        </button>
+      ) : null}
     </div>
   );
 });

@@ -11,6 +11,10 @@ export class ChatStore {
     makeAutoObservable(this);
   }
 
+  clearHistory = () => {
+    this.messages = [];
+  };
+
   addMessage = (message: {
     type: "text" | "document";
     content: string;
