@@ -115,6 +115,11 @@ export class AIAgentStore {
     this.saveConversationHistory();
   };
 
+  editChatMessage = (index: number, message: string) => {
+    this.chatHistory[index].content = message;
+    this.saveConversationHistory();
+  };
+
   stopAIMessage = () => {
     this.chainControlled.abort();
     runInAction(() => {
