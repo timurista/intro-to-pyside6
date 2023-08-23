@@ -150,13 +150,13 @@ export class AIAgentStore {
     };
 
     const mappedHistory = this.chatHistory.map((msg) =>
-      msg.sender === "human" ? "me" : "you" + ":\n" + msg.content
+      msg.sender === "human" ? "me" : "you" + "=> " + msg.content
     );
     // const compressedMessage = Compressor.lzwEncode(mappedHistory.join("\n"));
     const conversationSoFar = mappedHistory.slice(0, -1);
     const newMessage = `Some context... ${conversationSoFar.join(
       "\n"
-    )}.\n Based on this context, please answer the new question: ${message}`;
+    )}.\n Please read the context, and based on the context answer this question: ${message}`;
     // console.log("compressedMessage", compressedMessage);
 
     console.log("newMessage", newMessage);
