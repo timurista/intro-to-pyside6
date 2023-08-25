@@ -1,7 +1,10 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { observer } from "mobx-react";
 import { rootStore } from "../stores/RootStore";
-import MessageItem from "./MessageItem";
+// import MessageItem from "./MessageItem";
+import GhostLoader from "./GhostLoader";
+
+const MessageItem = React.lazy(() => import("./MessageItem"));
 
 import "github-markdown-css";
 
@@ -11,25 +14,19 @@ export const ChatWindow: React.FC = observer(() => {
 
   return (
     <div className="bg-gray-100 p-4 rounded-md overflow-y-auto h-96">
-      {chatHistory.map((message, index) =>
-        message.sender === "human" ? (
+      {chatHistory.map((message, index) => (
+        <Suspense fallback={<GhostLoader />} key={index}>
           <MessageItem
-            key={index}
             content={message.content}
-            className="bg-blue-200"
+            className={
+              message.sender === "human" ? "bg-blue-200" : "bg-gray-300"
+            }
             onDelete={() => deleteFromHistory(index)}
             onEdit={(newContent) => editChatMessage(index, newContent)}
+            defaultExpanded={index === chatHistory.length - 1}
           />
-        ) : (
-          <MessageItem
-            key={index}
-            content={message.content}
-            className="bg-gray-300"
-            onDelete={() => deleteFromHistory(index)}
-            onEdit={(newContent) => editChatMessage(index, newContent)}
-          />
-        )
-      )}
+        </Suspense>
+      ))}
     </div>
   );
 });

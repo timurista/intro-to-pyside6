@@ -17,6 +17,7 @@ interface MessageItemProps {
   className: string;
   onDelete: () => void;
   onEdit: (content: string) => void;
+  defaultExpanded?: boolean;
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({
@@ -24,9 +25,10 @@ const MessageItem: React.FC<MessageItemProps> = ({
   className,
   onDelete,
   onEdit,
+  defaultExpanded = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [editedContent, setEditedContent] = useState(content);
 
   const tokenCount = content.split(" ").length;
