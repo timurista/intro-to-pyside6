@@ -189,20 +189,18 @@ export class AIAgentStore {
     this.cancelToken = true;
   };
 
-  addDocument = (file: File) => {
-    this.documentHistory.push({ name: file.name, file: file });
-  };
-
-  removeDocument = (name: string) => {
-    this.documentHistory = this.documentHistory.filter(
-      (doc) => doc.name !== name
-    );
+  addDocument = async (file: File) => {
+    // if it's pdf then convert to text
+    const text = await file.text();
+    this.chatHistory.push({
+      sender: "human",
+      content: `Here is a file named: "${file.name}", READ the contents below: \n${text}`,
+    });
   };
 
   clearHistory = () => {
     this.stopAIMessage();
     this.chatHistory = [];
-    this.documentHistory = [];
     this.clearLoadedConversationHistory();
   };
 }

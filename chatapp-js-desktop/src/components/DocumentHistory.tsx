@@ -4,8 +4,7 @@ import { rootStore } from "../stores/RootStore"; // Update the import path to yo
 import { AiOutlineDelete } from "react-icons/ai"; // Assuming you're using react-icons
 
 const DocumentHistory: React.FC = observer(() => {
-  const { documentHistory, addDocument, removeDocument } =
-    rootStore.aiAgentStore;
+  const { addDocument } = rootStore.aiAgentStore;
 
   const handleDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
@@ -15,22 +14,10 @@ const DocumentHistory: React.FC = observer(() => {
 
   return (
     <div className="mb-4">
-      <label className="ml-2 inline-block bg-green-500 text-white px-4 py-2 rounded-md cursor-pointer">
+      <label className="inline-block bg-green-500 text-white px-4 py-2 rounded-md cursor-pointer">
         Upload Document
         <input type="file" className="hidden" onChange={handleDocumentUpload} />
       </label>
-
-      <div className="mt-2">
-        {documentHistory.map((doc) => (
-          <div key={doc.name} className="flex items-center space-x-2">
-            <span>{doc.name}</span>
-            <AiOutlineDelete
-              onClick={() => removeDocument(doc.name)}
-              cursor="pointer"
-            />
-          </div>
-        ))}
-      </div>
     </div>
   );
 });

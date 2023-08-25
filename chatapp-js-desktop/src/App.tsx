@@ -5,7 +5,6 @@ import "./App.css";
 import { rootStore } from "./stores/RootStore";
 import { ChatWindow } from "./components/ChatWindow";
 import ChatInput from "./components/ChatInput";
-import DocumentHistory from "./components/DocumentHistory";
 
 const App: React.FC = observer(() => {
   return (
@@ -16,7 +15,6 @@ const App: React.FC = observer(() => {
         <ChatWindow />
 
         <ChatInput />
-        <DocumentHistory />
       </div>
     </Provider>
   );
